@@ -1,0 +1,2 @@
+# voice-notes-app-bolt
+A minimalist voice-to-text notes app that automatically transcribes speech, saves notes locally, and organizes them in a sleek, Twitter-inspired interface. Features include a side menu for quick note access, profile-based note separation (no login required), light/dark themes, and instant auto-save when recording stops — built to demonstrate fast, AI-enhanced productivity and modern UI design.
