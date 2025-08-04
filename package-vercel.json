@@ -1,0 +1,32 @@
+{
+  "name": "voiceink",
+  "version": "1.0.0",
+  "description": "VoiceInk - Transform your voice into organized notes with smart transcription and profile management",
+  "main": "api/index.ts",
+  "scripts": {
+    "build": "cd client && npm run build",
+    "dev": "cd client && npm run dev",
+    "start": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "@vercel/node": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "your-github-repo-url"
+  },
+  "keywords": [
+    "voice-notes",
+    "speech-to-text",
+    "transcription",
+    "react",
+    "typescript",
+    "voice-recording"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
