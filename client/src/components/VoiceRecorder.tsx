@@ -96,10 +96,13 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     if (!recognitionRef.current || !isSupported) return;
     
     setRecognitionError(''); // Clear any previous errors
+    console.log('Attempting to start speech recognition...');
+    
     try {
       recognitionRef.current.start();
       setIsRecording(true);
       setIsPaused(false);
+      console.log('Speech recognition started successfully');
     } catch (error) {
       console.error('Error starting recognition:', error);
       setRecognitionError('Failed to start recording. Please refresh the page and try again.');
