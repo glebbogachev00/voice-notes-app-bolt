@@ -83,7 +83,7 @@ function App() {
               <h1 className={`text-3xl font-bold mb-2 ${
                 theme === 'dark' ? 'text-white' : 'text-black'
               }`}>
-                Voice Notes
+                VoiceInk
               </h1>
               <p className={`${
                 theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
