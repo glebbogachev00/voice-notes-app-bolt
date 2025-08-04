@@ -12,7 +12,7 @@ import { useSavedNotes } from './hooks/useSavedNotes';
 function App() {
   const { theme, toggleTheme } = useTheme();
   const { profiles, currentProfile, createProfile, switchProfile, deleteProfile } = useProfiles();
-  const [notes, setNotes] = useLocalStorage('voice-notes-notes', '', currentProfile?.id);
+  const [notes, setNotes] = useLocalStorage('voiceink-notes', '', currentProfile?.id);
   const { savedNotes, saveNote, deleteNote, clearAllNotes } = useSavedNotes(currentProfile?.id);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showProfileManager, setShowProfileManager] = useState(false);
@@ -30,7 +30,7 @@ function App() {
       const updatedProfiles = profiles.map(p => 
         p.id === currentProfile.id ? { ...p, username: newUsername } : p
       );
-      localStorage.setItem('voice-notes-profiles', JSON.stringify(updatedProfiles));
+      localStorage.setItem('voiceink-profiles', JSON.stringify(updatedProfiles));
     }
   };
   const handleNotesChange = (newNotes: string) => {

@@ -3,7 +3,7 @@ import { SavedNote } from '../types/profile';
 
 export function useSavedNotes(profileId?: string) {
   const [savedNotes, setSavedNotes] = useState<SavedNote[]>([]);
-  const storageKey = profileId ? `voice-notes-saved-notes-${profileId}` : 'voice-notes-saved-notes';
+  const storageKey = profileId ? `voiceink-saved-notes-${profileId}` : 'voiceink-saved-notes';
 
   useEffect(() => {
     const loadNotes = () => {

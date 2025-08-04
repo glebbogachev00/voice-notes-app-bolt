@@ -7,8 +7,8 @@ export function useProfiles() {
 
   useEffect(() => {
     // Load profiles from localStorage
-    const savedProfiles = localStorage.getItem('voice-notes-profiles');
-    const currentProfileId = localStorage.getItem('voice-notes-current-profile');
+    const savedProfiles = localStorage.getItem('voiceink-profiles');
+    const currentProfileId = localStorage.getItem('voiceink-current-profile');
     
     if (savedProfiles) {
       const parsedProfiles = JSON.parse(savedProfiles);
@@ -25,7 +25,7 @@ export function useProfiles() {
 
   const saveProfiles = (newProfiles: Profile[]) => {
     setProfiles(newProfiles);
-    localStorage.setItem('voice-notes-profiles', JSON.stringify(newProfiles));
+    localStorage.setItem('voiceink-profiles', JSON.stringify(newProfiles));
   };
 
   const createProfile = (username: string, password?: string): Profile => {
@@ -54,7 +54,7 @@ export function useProfiles() {
     
     saveProfiles(updatedProfiles);
     setCurrentProfile(updatedProfile);
-    localStorage.setItem('voice-notes-current-profile', profile.id);
+    localStorage.setItem('voiceink-current-profile', profile.id);
     return true;
   };
 
@@ -63,12 +63,12 @@ export function useProfiles() {
     saveProfiles(updatedProfiles);
     
     // Clear profile-specific data
-    localStorage.removeItem(`voice-notes-notes-${profileId}`);
-    localStorage.removeItem(`voice-notes-saved-notes-${profileId}`);
+    localStorage.removeItem(`voiceink-notes-${profileId}`);
+    localStorage.removeItem(`voiceink-saved-notes-${profileId}`);
     
     if (currentProfile?.id === profileId) {
       setCurrentProfile(null);
-      localStorage.removeItem('voice-notes-current-profile');
+      localStorage.removeItem('voiceink-current-profile');
     }
   };
 
