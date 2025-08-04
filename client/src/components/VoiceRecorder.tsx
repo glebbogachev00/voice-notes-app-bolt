@@ -19,6 +19,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setIsSupported(false);
+      setRecognitionError('Speech recognition is not supported in this browser. Please use Chrome, Safari, or Edge for voice recording, or type your notes manually above.');
       return;
     }
 
@@ -54,7 +55,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
           errorMessage = 'Microphone access denied. Please allow microphone access and try again.';
           break;
         case 'network':
-          errorMessage = 'Network error occurred. Please check your internet connection and try again.';
+          errorMessage = 'Speech recognition service unavailable. The Web Speech API requires internet access to Google\'s servers. You can still type your notes manually above.';
           break;
         case 'no-speech':
           errorMessage = 'No speech detected. Please try speaking closer to the microphone.';
@@ -101,6 +102,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       setIsPaused(false);
     } catch (error) {
       console.error('Error starting recognition:', error);
+      setRecognitionError('Failed to start recording. Please refresh the page and try again.');
     }
   };
 
@@ -238,7 +240,8 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       
       <div className="text-center">
         <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-          {!isRecording && !isPaused && 'Tap to start recording'}
+          {!isRecording && !isPaused && !recognitionError && 'Tap to start recording'}
+          {!isRecording && !isPaused && recognitionError && 'Voice recording unavailable - use the text area above to type your notes'}
           {isRecording && !isPaused && 'Recording... Speak now'}
           {isPaused && 'Recording paused'}
         </p>
