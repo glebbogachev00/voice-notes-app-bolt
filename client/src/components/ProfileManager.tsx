@@ -387,4 +387,4 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({
   );
 };
 
-export default ProfileManager;</parameter>
+export default ProfileManager;

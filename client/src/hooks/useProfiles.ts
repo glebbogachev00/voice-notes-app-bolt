@@ -79,4 +79,4 @@ export function useProfiles() {
     switchProfile,
     deleteProfile
   };
-}</parameter>
+}

@@ -209,4 +209,4 @@ const SideMenu: React.FC<SideMenuProps> = ({
   );
 };
 
-export default SideMenu;</parameter>
+export default SideMenu;
