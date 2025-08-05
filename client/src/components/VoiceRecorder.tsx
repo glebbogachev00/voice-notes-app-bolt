@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Square } from 'lucide-react';
+import { Mic, MicOff, Square, RefreshCw } from 'lucide-react';
 
 interface VoiceRecorderProps {
   onTranscriptUpdate: (transcript: string) => void;
@@ -11,16 +11,23 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
   const [isPaused, setIsPaused] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
   const [recognitionError, setRecognitionError] = useState<string>('');
+  const [isRetrying, setIsRetrying] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [currentTranscript, setCurrentTranscript] = useState('');
 
-  useEffect(() => {
+  const initializeRecognition = () => {
     // Check if speech recognition is supported
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setIsSupported(false);
       setRecognitionError('Speech recognition is not supported in this browser. Please use Chrome, Safari, or Edge for voice recording, or type your notes manually above.');
-      return;
+      return null;
+    }
+
+    // Check if we're on HTTPS (required for Web Speech API)
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      setRecognitionError('Speech recognition requires HTTPS. Please access this app via HTTPS or localhost.');
+      return null;
     }
 
     const recognition = new SpeechRecognition();
@@ -52,10 +59,10 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       
       switch (event.error) {
         case 'not-allowed':
-          errorMessage = 'Microphone access denied. Please allow microphone access and try again.';
+          errorMessage = 'Microphone access denied. Please allow microphone access in your browser settings and try again.';
           break;
         case 'network':
-          errorMessage = 'Speech recognition service unavailable. The Web Speech API requires internet access to Google\'s servers. You can still type your notes manually above.';
+          errorMessage = 'Speech recognition service unavailable. This might be due to network issues, browser restrictions, or firewall settings. You can still type your notes manually above.';
           break;
         case 'no-speech':
           errorMessage = 'No speech detected. Please try speaking closer to the microphone.';
@@ -85,12 +92,34 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       setIsPaused(false);
     };
 
-    recognitionRef.current = recognition;
+    return recognition;
+  };
+
+  useEffect(() => {
+    recognitionRef.current = initializeRecognition();
 
     return () => {
-      recognition.stop();
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
     };
   }, [onTranscriptUpdate]);
+
+  const retryConnection = () => {
+    setIsRetrying(true);
+    setRecognitionError('');
+    
+    // Stop current recognition if running
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    
+    // Reinitialize recognition
+    setTimeout(() => {
+      recognitionRef.current = initializeRecognition();
+      setIsRetrying(false);
+    }, 1000);
+  };
 
   const startRecording = () => {
     if (!recognitionRef.current || !isSupported) return;
@@ -150,12 +179,30 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
   return (
     <div className="flex flex-col items-center space-y-4">
       {recognitionError && (
-        <div className={`p-3 rounded-lg max-w-md text-center border transition-colors ${
+        <div className={`p-4 rounded-lg max-w-md text-center border transition-colors ${
           theme === 'dark' 
             ? 'bg-red-900/20 border-red-800 text-red-300' 
             : 'bg-red-50 border-red-200 text-red-700'
         }`}>
-          <p className="text-sm">{recognitionError}</p>
+          <p className="text-sm mb-3">{recognitionError}</p>
+          <button
+            onClick={retryConnection}
+            disabled={isRetrying}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              isRetrying
+                ? 'opacity-50 cursor-not-allowed'
+                : theme === 'dark'
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
+            }`}
+          >
+            {isRetrying ? (
+              <RefreshCw size={16} className="animate-spin inline mr-2" />
+            ) : (
+              <RefreshCw size={16} className="inline mr-2" />
+            )}
+            Retry Connection
+          </button>
         </div>
       )}
       
@@ -171,7 +218,12 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
         {!isRecording && !isPaused && (
           <button
             onClick={startRecording}
-            className="w-16 h-16 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-105 active:scale-95"
+            disabled={!!recognitionError}
+            className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-105 active:scale-95 ${
+              recognitionError
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-blue-500 hover:bg-blue-600 text-white'
+            }`}
             aria-label="Start recording"
           >
             <Mic size={24} />
@@ -214,17 +266,11 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
           <>
             <button
               onClick={resumeRecording}
-              className="w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center transition-all duration-200"
+              className="w-16 h-16 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-105 active:scale-95"
               aria-label="Resume recording"
             >
-              <Mic size={20} />
+              <Mic size={24} />
             </button>
-            
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-              theme === 'dark' ? 'bg-gray-700' : 'bg-gray-300'
-            }`}>
-              <div className="text-sm font-semibold">⏸</div>
-            </div>
             
             <button
               onClick={stopRecording}
@@ -241,14 +287,11 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
         )}
       </div>
       
-      <div className="text-center">
-        <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-          {!isRecording && !isPaused && !recognitionError && 'Tap to start recording'}
-          {!isRecording && !isPaused && recognitionError && 'Voice recording unavailable - use the text area above to type your notes'}
-          {isRecording && !isPaused && 'Recording... Speak now'}
-          {isPaused && 'Recording paused'}
+      {recognitionError && (
+        <p className={`text-xs text-center ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
+          Voice recording unavailable - use the text area above to type your notes
         </p>
-      </div>
+      )}
     </div>
   );
 };
