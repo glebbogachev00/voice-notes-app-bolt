@@ -100,9 +100,14 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
         cleanText.toLowerCase().startsWith(word)
       );
       
+      // Check for repetitive patterns (like "hello hello hello")
+      const words = cleanText.toLowerCase().split(' ');
+      const uniqueWords = [...new Set(words)];
+      const isRepetitive = words.length > 3 && uniqueWords.length <= 2;
+      
       // Add punctuation based on pause duration and content
-      if (pauseDuration > 2000) {
-        // Long pause (2+ seconds) = period, question mark, or exclamation
+      if (pauseDuration > 1500) {
+        // Long pause (1.5+ seconds) = period, question mark, or exclamation
         if (isQuestion) {
           return cleanText + '? ';
         } else if (isExclamation) {
@@ -112,15 +117,18 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
         } else {
           return cleanText + '. ';
         }
-      } else if (pauseDuration > 800) {
-        // Medium pause (0.8-2 seconds) = comma or question mark
-        if (isQuestion && pauseDuration > 1500) {
+      } else if (pauseDuration > 600) {
+        // Medium pause (0.6-1.5 seconds) = comma or question mark
+        if (isQuestion && pauseDuration > 1000) {
           return cleanText + '? ';
         } else {
           return cleanText + ', ';
         }
-      } else if (pauseDuration > 400) {
-        // Short pause (0.4-0.8 seconds) = comma
+      } else if (pauseDuration > 300) {
+        // Short pause (0.3-0.6 seconds) = comma
+        return cleanText + ', ';
+      } else if (isRepetitive) {
+        // For repetitive patterns, add commas to break them up
         return cleanText + ', ';
       }
       
@@ -140,7 +148,12 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
         cleanText.toLowerCase().includes(word)
       ) || cleanText.toLowerCase().includes('!');
       
-      if (pauseDuration > 2000) {
+      // Check for repetitive patterns
+      const words = cleanText.toLowerCase().split(' ');
+      const uniqueWords = [...new Set(words)];
+      const isRepetitive = words.length > 3 && uniqueWords.length <= 2;
+      
+      if (pauseDuration > 1500) {
         if (isQuestion) {
           return cleanText + '? ';
         } else if (isExclamation) {
@@ -148,13 +161,15 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
         } else {
           return cleanText + '. ';
         }
-      } else if (pauseDuration > 800) {
-        if (isQuestion && pauseDuration > 1500) {
+      } else if (pauseDuration > 600) {
+        if (isQuestion && pauseDuration > 1000) {
           return cleanText + '? ';
         } else {
           return cleanText + ', ';
         }
-      } else if (pauseDuration > 400) {
+      } else if (pauseDuration > 300) {
+        return cleanText + ', ';
+      } else if (isRepetitive) {
         return cleanText + ', ';
       }
       
@@ -182,7 +197,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
         const fullTranscript = finalTranscriptRef.current + interimTranscriptRef.current;
         setCurrentTranscript(fullTranscript);
       }
-    }, 100); // Small delay to ensure we don't add punctuation too quickly
+    }, 300); // Increased delay to better detect pauses
   };
 
   const initializeRecognition = () => {
@@ -236,20 +251,36 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       // Update last speech time
       lastSpeechTimeRef.current = Date.now();
       
-      // Handle final results
+      // Handle final results with immediate punctuation
       if (finalTranscript) {
-        finalTranscriptRef.current += finalTranscript + ' ';
+        // Add punctuation to final transcript immediately
+        const punctuatedFinal = addPunctuation(finalTranscript, 500); // Default pause
+        finalTranscriptRef.current += punctuatedFinal;
       }
       
-      // Handle interim results
-      interimTranscriptRef.current = interimTranscript;
+      // Handle interim results with more aggressive punctuation
+      if (interimTranscript.trim()) {
+        // Process interim text more aggressively
+        const words = interimTranscript.trim().split(' ');
+        if (words.length >= 3) {
+          // If we have enough words, try to add punctuation
+          const punctuatedInterim = addPunctuation(interimTranscript, 200); // Shorter pause for interim
+          interimTranscriptRef.current = punctuatedInterim;
+        } else {
+          interimTranscriptRef.current = interimTranscript;
+        }
+      } else {
+        interimTranscriptRef.current = interimTranscript;
+      }
       
       // Update display
       const fullTranscript = finalTranscriptRef.current + interimTranscriptRef.current;
       setCurrentTranscript(fullTranscript);
       
-      // Handle speech pause for punctuation
-      handleSpeechPause();
+      // Handle speech pause for punctuation on interim text
+      if (interimTranscript.trim()) {
+        handleSpeechPause();
+      }
     };
 
     recognition.onerror = (event) => {
