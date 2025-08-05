@@ -13,11 +13,40 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
   const [recognitionError, setRecognitionError] = useState<string>('');
   const [isRetrying, setIsRetrying] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
+  const [browserInfo, setBrowserInfo] = useState<string>('');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [currentTranscript, setCurrentTranscript] = useState('');
 
+  const detectBrowser = () => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    let browser = 'Unknown';
+    let version = '';
+    
+    if (userAgent.includes('chrome') && !userAgent.includes('edg')) {
+      browser = 'Chrome';
+    } else if (userAgent.includes('safari') && !userAgent.includes('chrome')) {
+      browser = 'Safari';
+    } else if (userAgent.includes('firefox')) {
+      browser = 'Firefox';
+    } else if (userAgent.includes('edg')) {
+      browser = 'Edge';
+    } else if (userAgent.includes('arc')) {
+      browser = 'Arc';
+    }
+    
+    // Extract version
+    const versionMatch = userAgent.match(/(chrome|safari|firefox|edg|arc)\/(\d+)/i);
+    if (versionMatch) {
+      version = versionMatch[2];
+    }
+    
+    return { browser, version };
+  };
+
   const getDebugInfo = () => {
+    const { browser, version } = detectBrowser();
     const info = {
+      browser: `${browser} ${version}`,
       userAgent: navigator.userAgent,
       protocol: window.location.protocol,
       hostname: window.location.hostname,
@@ -34,7 +63,8 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setIsSupported(false);
-      setRecognitionError('Speech recognition is not supported in this browser. Please use Chrome, Safari, or Edge for voice recording, or type your notes manually above.');
+      const { browser } = detectBrowser();
+      setRecognitionError(`Speech recognition is not supported in ${browser}. Please use Chrome, Safari, or Edge for voice recording, or type your notes manually above.`);
       return null;
     }
 
@@ -45,9 +75,23 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     }
 
     const recognition = new SpeechRecognition();
+    const { browser } = detectBrowser();
+    
+    // Configure recognition based on browser
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
+    
+    // Safari-specific settings
+    if (browser === 'Safari') {
+      recognition.continuous = false; // Safari works better with continuous: false
+    }
+    
+    // Arc-specific settings (Arc is Chromium-based, so it should work like Chrome)
+    if (browser === 'Arc') {
+      recognition.continuous = true;
+      recognition.interimResults = true;
+    }
 
     let finalTranscript = '';
 
@@ -70,13 +114,14 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
       let errorMessage = '';
+      const { browser } = detectBrowser();
       
       switch (event.error) {
         case 'not-allowed':
-          errorMessage = 'Microphone access denied. Please allow microphone access in your browser settings and try again.';
+          errorMessage = `Microphone access denied in ${browser}. Please allow microphone access in your browser settings and try again.`;
           break;
         case 'network':
-          errorMessage = 'Speech recognition service unavailable. This might be due to network issues, browser restrictions, or firewall settings. You can still type your notes manually above.';
+          errorMessage = `Speech recognition service unavailable in ${browser}. This might be due to network issues, browser restrictions, or firewall settings. You can still type your notes manually above.`;
           break;
         case 'no-speech':
           errorMessage = 'No speech detected. Please try speaking closer to the microphone.';
@@ -88,7 +133,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
           errorMessage = 'Speech recognition was aborted.';
           break;
         default:
-          errorMessage = `Speech recognition error: ${event.error}. Please try again.`;
+          errorMessage = `Speech recognition error in ${browser}: ${event.error}. Please try again.`;
       }
       
       setRecognitionError(errorMessage);
@@ -104,12 +149,28 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       setCurrentTranscript('');
       setIsRecording(false);
       setIsPaused(false);
+      
+      // For Safari, restart recognition automatically if it was recording
+      if (browser === 'Safari' && isRecording) {
+        setTimeout(() => {
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.start();
+              setIsRecording(true);
+            } catch (error) {
+              console.error('Error restarting Safari recognition:', error);
+            }
+          }
+        }, 100);
+      }
     };
 
     return recognition;
   };
 
   useEffect(() => {
+    const { browser, version } = detectBrowser();
+    setBrowserInfo(`${browser} ${version}`);
     recognitionRef.current = initializeRecognition();
 
     return () => {
@@ -186,10 +247,11 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
   };
 
   if (!isSupported) {
+    const { browser } = detectBrowser();
     return (
       <div className="text-center">
         <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-          Speech recognition is not supported in your browser.
+          Speech recognition is not supported in {browser}.
         </p>
         <p className={`text-xs mt-2 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
           Please use Chrome, Safari, or Edge for voice recording.
@@ -200,6 +262,12 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
 
   return (
     <div className="flex flex-col items-center space-y-4">
+      {browserInfo && (
+        <div className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
+          Browser: {browserInfo}
+        </div>
+      )}
+      
       {recognitionError && (
         <div className={`p-4 rounded-lg max-w-md text-center border transition-colors ${
           theme === 'dark' 
