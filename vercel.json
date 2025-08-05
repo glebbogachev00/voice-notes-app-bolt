@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "name": "voiceink",
+  "name": "voice-notes-app",
   "buildCommand": "npm run build",
-  "outputDirectory": "client/dist",
+  "outputDirectory": "dist",
   "framework": "vite",
   "installCommand": "npm install",
   "devCommand": "npm run dev",

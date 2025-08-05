@@ -31,6 +31,19 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Notes API endpoints (if you want server-side storage)
+app.get('/api/notes', (req, res) => {
+  // For now, return empty array since you're using localStorage
+  // You can implement database storage here later
+  res.json([]);
+});
+
+app.post('/api/notes', (req, res) => {
+  // For now, just acknowledge the request
+  // You can implement database storage here later
+  res.json({ success: true, message: 'Note saved (client-side storage)' });
+});
+
 // Export for Vercel
 export default (req: VercelRequest, res: VercelResponse) => {
   return app(req, res);

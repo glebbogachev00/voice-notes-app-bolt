@@ -1,79 +1,79 @@
-# VoiceInk - Vercel Deployment Guide
+# Voice Notes App - Vercel Deployment
 
-## Overview
-VoiceInk is a voice-to-text notes application with profile management, designed to work seamlessly on Vercel's platform.
-
-## Deployment Steps
-
-### 1. Prerequisites
-- GitHub account with your VoiceInk repository
-- Vercel account (free tier works)
-
-### 2. Deploy to Vercel
-
-#### Option A: Using Vercel CLI
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy from your project directory
-vercel
-
-# Follow the prompts:
-# - Link to existing project or create new
-# - Choose deployment settings
-```
-
-#### Option B: Using Vercel Dashboard
-1. Go to [vercel.com](https://vercel.com)
-2. Click "New Project"
-3. Import your GitHub repository
-4. Vercel will auto-detect the configuration from `vercel.json`
-5. Click "Deploy"
-
-### 3. Environment Variables
-If your app requires any environment variables, add them in:
-- Vercel Dashboard → Project → Settings → Environment Variables
-
-### 4. Custom Domain (Optional)
-- In Vercel Dashboard → Project → Settings → Domains
-- Add your custom domain
-- Follow DNS configuration instructions
-
-## Project Structure
-```
-voiceink/
-├── client/           # React frontend
-├── server/          # Express backend (not used in Vercel)
-├── api/             # Vercel serverless functions
-├── vercel.json      # Vercel configuration
-├── .vercelignore    # Files to ignore during deployment
-└── build.sh         # Build script
-```
+This is a voice-to-text notes application built with React, TypeScript, and Vite, optimized for deployment on Vercel.
 
 ## Features
-- ✅ Voice recording and transcription
-- ✅ Multi-profile support with password protection
-- ✅ Dark/light theme switching
-- ✅ Local storage for data persistence
-- ✅ Responsive design
-- ✅ Works offline (except voice transcription)
 
-## Technical Notes
-- **Frontend Only**: VoiceInk is primarily a client-side application
-- **Local Storage**: All data is stored locally in the browser
-- **Voice API**: Uses Web Speech API (requires HTTPS - Vercel provides this)
-- **No Database**: No server-side database required
-- **Static Hosting**: Perfect for Vercel's static hosting with serverless functions
+- Voice recording and transcription using Web Speech API
+- Multiple user profiles with password protection
+- Dark/light theme toggle
+- Local storage for notes persistence
+- Responsive design with Tailwind CSS
 
-## Browser Compatibility
-- ✅ Chrome (recommended for voice features)
-- ✅ Safari
-- ✅ Edge
-- ⚠️ Firefox (limited voice support)
+## Local Development
 
-## Support
-For deployment issues, check:
-1. Vercel deployment logs
-2. Browser console for client-side errors
-3. Ensure HTTPS is enabled for voice features
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+3. Open your browser and navigate to `http://localhost:5173`
+
+## Deployment to Vercel
+
+1. Push your code to a GitHub repository
+
+2. Connect your repository to Vercel:
+   - Go to [vercel.com](https://vercel.com)
+   - Click "New Project"
+   - Import your GitHub repository
+   - Vercel will automatically detect the Vite configuration
+
+3. Deploy settings (should be auto-detected):
+   - **Framework Preset**: Vite
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+   - **Install Command**: `npm install`
+
+4. Click "Deploy"
+
+## Project Structure
+
+```
+├── client/                 # React frontend
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   ├── hooks/         # Custom React hooks
+│   │   └── types/         # TypeScript type definitions
+│   └── index.html
+├── api/                   # Vercel serverless functions
+│   └── index.ts          # API routes
+├── shared/               # Shared types and schemas
+├── vite.config.ts        # Vite configuration
+├── vercel.json          # Vercel deployment configuration
+└── package.json
+```
+
+## API Endpoints
+
+- `GET /api/health` - Health check endpoint
+- `GET /api/notes` - Get notes (currently returns empty array, uses localStorage)
+- `POST /api/notes` - Save notes (currently acknowledges request, uses localStorage)
+
+## Notes
+
+- The app uses localStorage for data persistence, so notes are stored locally in the browser
+- Voice transcription requires internet access for Google's Web Speech API
+- All user profiles and notes are stored client-side for privacy
+
+## Environment Variables
+
+No environment variables are required for basic functionality. If you want to add database storage later, you can add:
+
+- `DATABASE_URL` - For database connection
+- `JWT_SECRET` - For authentication tokens
