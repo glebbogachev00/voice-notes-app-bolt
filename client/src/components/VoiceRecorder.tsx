@@ -68,112 +68,33 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
   const addPunctuation = (text: string, pauseDuration: number): string => {
     if (!text.trim()) return text;
     
-    // Remove any existing punctuation at the end
-    const cleanText = text.trim().replace(/[.,!?;:]$/, '');
-    
-    // Use compromise for better natural language processing
     try {
-      const doc = nlp(cleanText);
+      // Use compromise to process the text and add proper punctuation
+      const doc = nlp(text);
       
-      // Check if it's a question using compromise
-      const isQuestion = doc.questions().length > 0 || 
-                        doc.match('(what|when|where|why|how|who|which|whose|whom)').length > 0 ||
-                        cleanText.toLowerCase().startsWith('what') ||
-                        cleanText.toLowerCase().startsWith('when') ||
-                        cleanText.toLowerCase().startsWith('where') ||
-                        cleanText.toLowerCase().startsWith('why') ||
-                        cleanText.toLowerCase().startsWith('how') ||
-                        cleanText.toLowerCase().startsWith('who') ||
-                        cleanText.toLowerCase().startsWith('which') ||
-                        cleanText.toLowerCase().startsWith('whose') ||
-                        cleanText.toLowerCase().startsWith('whom');
+      // Let compromise handle the punctuation based on natural language patterns
+      const processed = doc.normalize({
+        whitespace: true,
+        punctuation: true,
+        case: true,
+        numbers: true,
+        plurals: true,
+        verbs: true
+      });
       
-      // Check for exclamations
-      const exclamationWords = ['wow', 'amazing', 'incredible', 'fantastic', 'great', 'awesome', 'perfect', 'excellent', 'brilliant', 'outstanding'];
-      const isExclamation = exclamationWords.some(word => 
-        cleanText.toLowerCase().includes(word)
-      ) || cleanText.toLowerCase().includes('!');
+      // Get the processed text with proper punctuation
+      let result = processed.text();
       
-      // Check for imperative sentences (commands)
-      const imperativeWords = ['please', 'stop', 'go', 'come', 'look', 'listen', 'wait', 'help', 'start', 'finish'];
-      const isImperative = imperativeWords.some(word => 
-        cleanText.toLowerCase().startsWith(word)
-      );
-      
-      // Check for repetitive patterns (like "hello hello hello")
-      const words = cleanText.toLowerCase().split(' ');
-      const uniqueWords = [...new Set(words)];
-      const isRepetitive = words.length > 3 && uniqueWords.length <= 2;
-      
-      // Add punctuation based on pause duration and content
-      if (pauseDuration > 1500) {
-        // Long pause (1.5+ seconds) = period, question mark, or exclamation
-        if (isQuestion) {
-          return cleanText + '? ';
-        } else if (isExclamation) {
-          return cleanText + '! ';
-        } else if (isImperative) {
-          return cleanText + '. ';
-        } else {
-          return cleanText + '. ';
-        }
-      } else if (pauseDuration > 600) {
-        // Medium pause (0.6-1.5 seconds) = comma or question mark
-        if (isQuestion && pauseDuration > 1000) {
-          return cleanText + '? ';
-        } else {
-          return cleanText + ', ';
-        }
-      } else if (pauseDuration > 300) {
-        // Short pause (0.3-0.6 seconds) = comma
-        return cleanText + ', ';
-      } else if (isRepetitive) {
-        // For repetitive patterns, add commas to break them up
-        return cleanText + ', ';
+      // Add space at the end if needed
+      if (!result.endsWith(' ')) {
+        result += ' ';
       }
       
-      return cleanText + ' ';
+      return result;
     } catch (error) {
       console.warn('Error processing text with compromise:', error);
-      
-      // Fallback to simple punctuation
-      const questionWords = ['what', 'when', 'where', 'why', 'how', 'who', 'which', 'whose', 'whom'];
-      const isQuestion = questionWords.some(word => 
-        cleanText.toLowerCase().startsWith(word) || 
-        cleanText.toLowerCase().includes(` ${word} `)
-      );
-      
-      const exclamationWords = ['wow', 'amazing', 'incredible', 'fantastic', 'great', 'awesome', 'perfect'];
-      const isExclamation = exclamationWords.some(word => 
-        cleanText.toLowerCase().includes(word)
-      ) || cleanText.toLowerCase().includes('!');
-      
-      // Check for repetitive patterns
-      const words = cleanText.toLowerCase().split(' ');
-      const uniqueWords = [...new Set(words)];
-      const isRepetitive = words.length > 3 && uniqueWords.length <= 2;
-      
-      if (pauseDuration > 1500) {
-        if (isQuestion) {
-          return cleanText + '? ';
-        } else if (isExclamation) {
-          return cleanText + '! ';
-        } else {
-          return cleanText + '. ';
-        }
-      } else if (pauseDuration > 600) {
-        if (isQuestion && pauseDuration > 1000) {
-          return cleanText + '? ';
-        } else {
-          return cleanText + ', ';
-        }
-      } else if (pauseDuration > 300) {
-        return cleanText + ', ';
-      } else if (isRepetitive) {
-        return cleanText + ', ';
-      }
-      
-      return cleanText + ' ';
+      // Fallback: just add a space
+      return text.trim() + ' ';
     }
   };
 
@@ -251,33 +172,20 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       // Update last speech time
       lastSpeechTimeRef.current = Date.now();
       
-      // Handle final results with immediate punctuation
+      // Handle final results with compromise processing
       if (finalTranscript) {
-        // Add punctuation to final transcript immediately
-        const punctuatedFinal = addPunctuation(finalTranscript, 500); // Default pause
-        finalTranscriptRef.current += punctuatedFinal;
+        const processedFinal = addPunctuation(finalTranscript, 0);
+        finalTranscriptRef.current += processedFinal;
       }
       
-      // Handle interim results with more aggressive punctuation
-      if (interimTranscript.trim()) {
-        // Process interim text more aggressively
-        const words = interimTranscript.trim().split(' ');
-        if (words.length >= 3) {
-          // If we have enough words, try to add punctuation
-          const punctuatedInterim = addPunctuation(interimTranscript, 200); // Shorter pause for interim
-          interimTranscriptRef.current = punctuatedInterim;
-        } else {
-          interimTranscriptRef.current = interimTranscript;
-        }
-      } else {
-        interimTranscriptRef.current = interimTranscript;
-      }
+      // Handle interim results
+      interimTranscriptRef.current = interimTranscript;
       
       // Update display
       const fullTranscript = finalTranscriptRef.current + interimTranscriptRef.current;
       setCurrentTranscript(fullTranscript);
       
-      // Handle speech pause for punctuation on interim text
+      // Simple pause detection for interim text
       if (interimTranscript.trim()) {
         handleSpeechPause();
       }
@@ -638,7 +546,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       
       <div className={`text-center max-w-md ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
         <p className="text-xs">
-          💡 Tip: Pause briefly for commas, longer for periods, use question words for "?"
+          💡 Tip: Speak naturally - AI will add proper punctuation automatically
         </p>
       </div>
     </div>
