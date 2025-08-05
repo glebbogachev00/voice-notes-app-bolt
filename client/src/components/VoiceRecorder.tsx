@@ -17,6 +17,9 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
   const [browserInfo, setBrowserInfo] = useState<string>('');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [currentTranscript, setCurrentTranscript] = useState('');
+  // Track mutable recording state to avoid stale closures in callbacks
+  const isRecordingRef = useRef(false);
+  const isPausedRef = useRef(false);
   
   // Transcript state management
   const finalTranscriptRef = useRef<string>('');
@@ -183,6 +186,8 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       setRecognitionError(errorMessage);
       setIsRecording(false);
       setIsPaused(false);
+      isRecordingRef.current = false;
+      isPausedRef.current = false;
     };
 
     recognition.onend = () => {
@@ -202,21 +207,31 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       }
       
       setCurrentTranscript('');
-      setIsRecording(false);
-      setIsPaused(false);
-      
-      // Restart recognition for continuous mode (handles session timeout)
-      if (isRecording && browser !== 'Safari') {
-        setTimeout(() => {
-          if (recognitionRef.current) {
-            try {
-              recognitionRef.current.start();
-              console.log('Recognition restarted');
-            } catch (error) {
-              console.error('Error restarting recognition:', error);
+
+      if (isPausedRef.current) {
+        // User paused recording; keep paused state
+        setIsRecording(false);
+        setIsPaused(true);
+      } else if (isRecordingRef.current) {
+        // Recognition ended unexpectedly while recording - restart
+        setIsRecording(true);
+        setIsPaused(false);
+        if (browser !== 'Safari') {
+          setTimeout(() => {
+            if (recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+                console.log('Recognition restarted');
+              } catch (error) {
+                console.error('Error restarting recognition:', error);
+              }
             }
-          }
-        }, 100);
+          }, 100);
+        }
+      } else {
+        // Recording completely stopped
+        setIsRecording(false);
+        setIsPaused(false);
       }
     };
 
@@ -269,6 +284,8 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       recognitionRef.current.start();
       setIsRecording(true);
       setIsPaused(false);
+      isRecordingRef.current = true;
+      isPausedRef.current = false;
       console.log('Speech recognition started successfully');
     } catch (error) {
       console.error('Error starting recognition:', error);
@@ -278,24 +295,34 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
 
   const stopRecording = () => {
     if (!recognitionRef.current) return;
-    
+
+    isRecordingRef.current = false;
+    isPausedRef.current = false;
+    setIsRecording(false);
+    setIsPaused(false);
     recognitionRef.current.stop();
   };
 
   const pauseRecording = () => {
     if (!recognitionRef.current) return;
-    
-    recognitionRef.current.stop();
+
+    isRecordingRef.current = false;
+    isPausedRef.current = true;
+    setIsRecording(false);
     setIsPaused(true);
+    recognitionRef.current.stop();
   };
 
   const resumeRecording = () => {
     if (!recognitionRef.current) return;
-    
+
     setRecognitionError(''); // Clear any previous errors
     try {
       recognitionRef.current.start();
       setIsPaused(false);
+      setIsRecording(true);
+      isPausedRef.current = false;
+      isRecordingRef.current = true;
     } catch (error) {
       console.error('Error resuming recognition:', error);
     }

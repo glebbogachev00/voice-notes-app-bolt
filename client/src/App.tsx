@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import SideMenu from './components/SideMenu';
 import ProfileManager from './components/ProfileManager';
@@ -13,7 +13,7 @@ function App() {
   const { theme, toggleTheme } = useTheme();
   const { profiles, currentProfile, createProfile, switchProfile, deleteProfile } = useProfiles();
   const [notes, setNotes] = useLocalStorage('voiceink-notes', '', currentProfile?.id);
-  const { savedNotes, saveNote, deleteNote, clearAllNotes } = useSavedNotes(currentProfile?.id);
+  const { savedNotes, saveNote, clearAllNotes } = useSavedNotes(currentProfile?.id);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showProfileManager, setShowProfileManager] = useState(false);
 

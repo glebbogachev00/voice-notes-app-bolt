@@ -11,4 +11,4 @@ export interface SavedNote {
   content: string;
   timestamp: string;
   preview: string;
-}</parameter>
+}
