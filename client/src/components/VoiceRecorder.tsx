@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Square, RefreshCw, AlertCircle, Info } from 'lucide-react';
-import nlp from 'compromise';
 
 interface VoiceRecorderProps {
   onTranscriptUpdate: (transcript: string) => void;
@@ -18,9 +17,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [currentTranscript, setCurrentTranscript] = useState('');
   
-  // Punctuation timing variables
-  const lastSpeechTimeRef = useRef<number>(Date.now());
-  const pauseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Transcript state management
   const finalTranscriptRef = useRef<string>('');
   const interimTranscriptRef = useRef<string>('');
 
@@ -65,62 +62,6 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     return info;
   };
 
-  const addPunctuation = (text: string, pauseDuration: number): string => {
-    if (!text.trim()) return text;
-    
-    try {
-      // Use compromise to process the text and add proper punctuation
-      const doc = nlp(text);
-      
-      // Let compromise handle the punctuation based on natural language patterns
-      const processed = doc.normalize({
-        whitespace: true,
-        punctuation: true,
-        case: true,
-        numbers: true,
-        plurals: true,
-        verbs: true
-      });
-      
-      // Get the processed text with proper punctuation
-      let result = processed.text();
-      
-      // Add space at the end if needed
-      if (!result.endsWith(' ')) {
-        result += ' ';
-      }
-      
-      return result;
-    } catch (error) {
-      console.warn('Error processing text with compromise:', error);
-      // Fallback: just add a space
-      return text.trim() + ' ';
-    }
-  };
-
-  const handleSpeechPause = () => {
-    const now = Date.now();
-    const pauseDuration = now - lastSpeechTimeRef.current;
-    
-    // Clear existing timer
-    if (pauseTimerRef.current) {
-      clearTimeout(pauseTimerRef.current);
-    }
-    
-    // Set timer for punctuation detection
-    pauseTimerRef.current = setTimeout(() => {
-      if (interimTranscriptRef.current.trim()) {
-        const punctuatedText = addPunctuation(interimTranscriptRef.current, pauseDuration);
-        finalTranscriptRef.current += punctuatedText;
-        interimTranscriptRef.current = '';
-        
-        // Update the display
-        const fullTranscript = finalTranscriptRef.current + interimTranscriptRef.current;
-        setCurrentTranscript(fullTranscript);
-      }
-    }, 300); // Increased delay to better detect pauses
-  };
-
   const initializeRecognition = () => {
     // Check if speech recognition is supported
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -140,55 +81,43 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     const recognition = new SpeechRecognition();
     const { browser } = detectBrowser();
     
-    // Configure recognition based on browser
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    // Recommended Web Speech API configuration for best punctuation
+    recognition.continuous = true;           // Keep listening until stopped
+    recognition.interimResults = true;       // Get partial results while user speaks
+    recognition.lang = 'en-US';              // Language with punctuation support
     
     // Safari-specific settings
     if (browser === 'Safari') {
       recognition.continuous = false; // Safari works better with continuous: false
     }
-    
-    // Arc-specific settings (Arc is Chromium-based, so it should work like Chrome)
-    if (browser === 'Arc') {
-      recognition.continuous = true;
-      recognition.interimResults = true;
-    }
 
     recognition.onresult = (event) => {
-      let interimTranscript = '';
       let finalTranscript = '';
-      
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      let interimTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          finalTranscript += transcript;
+          finalTranscript += transcript + ' ';
         } else {
           interimTranscript += transcript;
         }
       }
-      
-      // Update last speech time
-      lastSpeechTimeRef.current = Date.now();
-      
-      // Handle final results with compromise processing
+
+      // Handle final results
       if (finalTranscript) {
-        const processedFinal = addPunctuation(finalTranscript, 0);
-        finalTranscriptRef.current += processedFinal;
+        finalTranscriptRef.current += finalTranscript;
       }
       
       // Handle interim results
       interimTranscriptRef.current = interimTranscript;
       
-      // Update display
+      // Update display with both final and interim text
       const fullTranscript = finalTranscriptRef.current + interimTranscriptRef.current;
       setCurrentTranscript(fullTranscript);
       
-      // Simple pause detection for interim text
-      if (interimTranscript.trim()) {
-        handleSpeechPause();
-      }
+      console.log('Final:', finalTranscript);
+      console.log('Interim:', interimTranscript);
     };
 
     recognition.onerror = (event) => {
@@ -222,12 +151,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     };
 
     recognition.onend = () => {
-      // Add final punctuation if there's interim text
-      if (interimTranscriptRef.current.trim()) {
-        const punctuatedText = addPunctuation(interimTranscriptRef.current, 1000);
-        finalTranscriptRef.current += punctuatedText;
-        interimTranscriptRef.current = '';
-      }
+      console.log('Recognition ended');
       
       // Send the final transcript
       if (finalTranscriptRef.current.trim()) {
@@ -239,21 +163,15 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       setIsRecording(false);
       setIsPaused(false);
       
-      // Clear any pending pause timers
-      if (pauseTimerRef.current) {
-        clearTimeout(pauseTimerRef.current);
-        pauseTimerRef.current = null;
-      }
-      
-      // For Safari, restart recognition automatically if it was recording
-      if (browser === 'Safari' && isRecording) {
+      // Restart recognition for continuous mode (handles session timeout)
+      if (isRecording && browser !== 'Safari') {
         setTimeout(() => {
           if (recognitionRef.current) {
             try {
               recognitionRef.current.start();
-              setIsRecording(true);
+              console.log('Recognition restarted');
             } catch (error) {
-              console.error('Error restarting Safari recognition:', error);
+              console.error('Error restarting recognition:', error);
             }
           }
         }, 100);
@@ -272,9 +190,6 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
-      if (pauseTimerRef.current) {
-        clearTimeout(pauseTimerRef.current);
-      }
     };
   }, [onTranscriptUpdate]);
 
@@ -287,14 +202,9 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       recognitionRef.current.stop();
     }
     
-    // Clear timers and reset state
-    if (pauseTimerRef.current) {
-      clearTimeout(pauseTimerRef.current);
-      pauseTimerRef.current = null;
-    }
+    // Reset transcript state
     finalTranscriptRef.current = '';
     interimTranscriptRef.current = '';
-    lastSpeechTimeRef.current = Date.now();
     
     // Reinitialize recognition
     setTimeout(() => {
@@ -309,10 +219,9 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     setRecognitionError(''); // Clear any previous errors
     console.log('Attempting to start speech recognition...');
     
-    // Reset punctuation state
+    // Reset transcript state
     finalTranscriptRef.current = '';
     interimTranscriptRef.current = '';
-    lastSpeechTimeRef.current = Date.now();
     
     try {
       recognitionRef.current.start();
@@ -546,7 +455,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       
       <div className={`text-center max-w-md ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
         <p className="text-xs">
-          💡 Tip: Speak naturally - AI will add proper punctuation automatically
+          💡 Tip: Speak naturally with pauses - browser will add punctuation automatically
         </p>
       </div>
     </div>
