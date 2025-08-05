@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Square, RefreshCw, AlertCircle, Info } from 'lucide-react';
+import nlp from 'compromise';
 
 interface VoiceRecorderProps {
   onTranscriptUpdate: (transcript: string) => void;
@@ -62,6 +63,39 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     return info;
   };
 
+  const addPunctuation = (text: string): string => {
+    if (!text.trim()) return text;
+    
+    try {
+      // Use compromise to add punctuation to the text
+      const doc = nlp(text);
+      
+      // Normalize the text with punctuation
+      const processed = doc.normalize({
+        whitespace: true,
+        punctuation: true,
+        case: true,
+        numbers: true,
+        plurals: true,
+        verbs: true
+      });
+      
+      // Get the processed text
+      let result = processed.text();
+      
+      // Ensure proper spacing
+      if (!result.endsWith(' ')) {
+        result += ' ';
+      }
+      
+      return result;
+    } catch (error) {
+      console.warn('Error processing text with compromise:', error);
+      // Fallback: just return the original text with a space
+      return text.trim() + ' ';
+    }
+  };
+
   const initializeRecognition = () => {
     // Check if speech recognition is supported
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -81,10 +115,10 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     const recognition = new SpeechRecognition();
     const { browser } = detectBrowser();
     
-    // Recommended Web Speech API configuration for best punctuation
+    // Recommended Web Speech API configuration for best transcription
     recognition.continuous = true;           // Keep listening until stopped
     recognition.interimResults = true;       // Get partial results while user speaks
-    recognition.lang = 'en-US';              // Language with punctuation support
+    recognition.lang = 'en-US';              // Language with best transcription
     
     // Safari-specific settings
     if (browser === 'Safari') {
@@ -104,19 +138,20 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
         }
       }
 
-      // Handle final results
+      // Handle final results with post-processing punctuation
       if (finalTranscript) {
-        finalTranscriptRef.current += finalTranscript;
+        const punctuatedFinal = addPunctuation(finalTranscript);
+        finalTranscriptRef.current += punctuatedFinal;
       }
       
-      // Handle interim results
+      // Handle interim results (no punctuation processing)
       interimTranscriptRef.current = interimTranscript;
       
       // Update display with both final and interim text
       const fullTranscript = finalTranscriptRef.current + interimTranscriptRef.current;
       setCurrentTranscript(fullTranscript);
       
-      console.log('Final:', finalTranscript);
+      console.log('Final (punctuated):', finalTranscript);
       console.log('Interim:', interimTranscript);
     };
 
@@ -152,6 +187,13 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
 
     recognition.onend = () => {
       console.log('Recognition ended');
+      
+      // Process any remaining interim text
+      if (interimTranscriptRef.current.trim()) {
+        const punctuatedInterim = addPunctuation(interimTranscriptRef.current);
+        finalTranscriptRef.current += punctuatedInterim;
+        interimTranscriptRef.current = '';
+      }
       
       // Send the final transcript
       if (finalTranscriptRef.current.trim()) {
@@ -455,7 +497,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       
       <div className={`text-center max-w-md ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
         <p className="text-xs">
-          💡 Tip: Speak naturally with pauses - browser will add punctuation automatically
+          💡 Tip: Speak naturally - punctuation will be added automatically when you pause
         </p>
       </div>
     </div>
