@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Square, RefreshCw } from 'lucide-react';
+import { Mic, MicOff, Square, RefreshCw, AlertCircle, Info } from 'lucide-react';
 
 interface VoiceRecorderProps {
   onTranscriptUpdate: (transcript: string) => void;
@@ -12,8 +12,22 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
   const [isSupported, setIsSupported] = useState(true);
   const [recognitionError, setRecognitionError] = useState<string>('');
   const [isRetrying, setIsRetrying] = useState(false);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [currentTranscript, setCurrentTranscript] = useState('');
+
+  const getDebugInfo = () => {
+    const info = {
+      userAgent: navigator.userAgent,
+      protocol: window.location.protocol,
+      hostname: window.location.hostname,
+      speechRecognition: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+      mediaDevices: !!navigator.mediaDevices,
+      online: navigator.onLine,
+      timestamp: new Date().toISOString()
+    };
+    return info;
+  };
 
   const initializeRecognition = () => {
     // Check if speech recognition is supported
@@ -163,6 +177,14 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     }
   };
 
+  const copyDebugInfo = () => {
+    const debugInfo = getDebugInfo();
+    const debugText = JSON.stringify(debugInfo, null, 2);
+    navigator.clipboard.writeText(debugText).then(() => {
+      alert('Debug information copied to clipboard!');
+    });
+  };
+
   if (!isSupported) {
     return (
       <div className="text-center">
@@ -184,25 +206,69 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
             ? 'bg-red-900/20 border-red-800 text-red-300' 
             : 'bg-red-50 border-red-200 text-red-700'
         }`}>
+          <div className="flex items-center justify-center mb-2">
+            <AlertCircle size={16} className="mr-2" />
+            <p className="text-sm font-medium">Speech Recognition Issue</p>
+          </div>
           <p className="text-sm mb-3">{recognitionError}</p>
-          <button
-            onClick={retryConnection}
-            disabled={isRetrying}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              isRetrying
-                ? 'opacity-50 cursor-not-allowed'
-                : theme === 'dark'
+          
+          <div className="flex flex-col space-y-2">
+            <button
+              onClick={retryConnection}
+              disabled={isRetrying}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                isRetrying
+                  ? 'opacity-50 cursor-not-allowed'
+                  : theme === 'dark'
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
+            >
+              {isRetrying ? (
+                <RefreshCw size={16} className="animate-spin inline mr-2" />
+              ) : (
+                <RefreshCw size={16} className="inline mr-2" />
+              )}
+              Retry Connection
+            </button>
+            
+            <button
+              onClick={() => setShowDebugInfo(!showDebugInfo)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                theme === 'dark'
+                  ? 'bg-gray-600 hover:bg-gray-700 text-white'
+                  : 'bg-gray-500 hover:bg-gray-600 text-white'
+              }`}
+            >
+              <Info size={16} className="inline mr-2" />
+              {showDebugInfo ? 'Hide' : 'Show'} Debug Info
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {showDebugInfo && (
+        <div className={`p-4 rounded-lg max-w-md border transition-colors ${
+          theme === 'dark' 
+            ? 'bg-gray-800 border-gray-700 text-gray-300' 
+            : 'bg-gray-100 border-gray-300 text-gray-700'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-medium">Debug Information</p>
+            <button
+              onClick={copyDebugInfo}
+              className={`px-2 py-1 rounded text-xs ${
+                theme === 'dark'
                   ? 'bg-blue-600 hover:bg-blue-700 text-white'
                   : 'bg-blue-500 hover:bg-blue-600 text-white'
-            }`}
-          >
-            {isRetrying ? (
-              <RefreshCw size={16} className="animate-spin inline mr-2" />
-            ) : (
-              <RefreshCw size={16} className="inline mr-2" />
-            )}
-            Retry Connection
-          </button>
+              }`}
+            >
+              Copy
+            </button>
+          </div>
+          <pre className="text-xs overflow-auto max-h-32">
+            {JSON.stringify(getDebugInfo(), null, 2)}
+          </pre>
         </div>
       )}
       
@@ -288,9 +354,14 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       </div>
       
       {recognitionError && (
-        <p className={`text-xs text-center ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
-          Voice recording unavailable - use the text area above to type your notes
-        </p>
+        <div className={`text-center max-w-md ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+          <p className="text-xs mb-2">
+            Voice recording unavailable - use the text area above to type your notes
+          </p>
+          <p className="text-xs">
+            💡 Try: Chrome browser, allow microphone access, check network connection
+          </p>
+        </div>
       )}
     </div>
   );
