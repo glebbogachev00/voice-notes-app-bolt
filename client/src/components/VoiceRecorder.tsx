@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Square, RefreshCw, AlertCircle, Info } from 'lucide-react';
+import nlp from 'compromise';
 
 interface VoiceRecorderProps {
   onTranscriptUpdate: (transcript: string) => void;
@@ -70,42 +71,95 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     // Remove any existing punctuation at the end
     const cleanText = text.trim().replace(/[.,!?;:]$/, '');
     
-    // Check for question patterns
-    const questionWords = ['what', 'when', 'where', 'why', 'how', 'who', 'which', 'whose', 'whom'];
-    const isQuestion = questionWords.some(word => 
-      cleanText.toLowerCase().startsWith(word) || 
-      cleanText.toLowerCase().includes(` ${word} `)
-    );
-    
-    // Check for exclamation patterns
-    const exclamationWords = ['wow', 'amazing', 'incredible', 'fantastic', 'great', 'awesome', 'perfect'];
-    const isExclamation = exclamationWords.some(word => 
-      cleanText.toLowerCase().includes(word)
-    ) || cleanText.toLowerCase().includes('!');
-    
-    // Add punctuation based on pause duration and content
-    if (pauseDuration > 2000) {
-      // Long pause (2+ seconds) = period or question mark
-      if (isQuestion) {
-        return cleanText + '? ';
-      } else if (isExclamation) {
-        return cleanText + '! ';
-      } else {
-        return cleanText + '. ';
-      }
-    } else if (pauseDuration > 800) {
-      // Medium pause (0.8-2 seconds) = comma or question mark
-      if (isQuestion && pauseDuration > 1500) {
-        return cleanText + '? ';
-      } else {
+    // Use compromise for better natural language processing
+    try {
+      const doc = nlp(cleanText);
+      
+      // Check if it's a question using compromise
+      const isQuestion = doc.questions().length > 0 || 
+                        doc.match('(what|when|where|why|how|who|which|whose|whom)').length > 0 ||
+                        cleanText.toLowerCase().startsWith('what') ||
+                        cleanText.toLowerCase().startsWith('when') ||
+                        cleanText.toLowerCase().startsWith('where') ||
+                        cleanText.toLowerCase().startsWith('why') ||
+                        cleanText.toLowerCase().startsWith('how') ||
+                        cleanText.toLowerCase().startsWith('who') ||
+                        cleanText.toLowerCase().startsWith('which') ||
+                        cleanText.toLowerCase().startsWith('whose') ||
+                        cleanText.toLowerCase().startsWith('whom');
+      
+      // Check for exclamations
+      const exclamationWords = ['wow', 'amazing', 'incredible', 'fantastic', 'great', 'awesome', 'perfect', 'excellent', 'brilliant', 'outstanding'];
+      const isExclamation = exclamationWords.some(word => 
+        cleanText.toLowerCase().includes(word)
+      ) || cleanText.toLowerCase().includes('!');
+      
+      // Check for imperative sentences (commands)
+      const imperativeWords = ['please', 'stop', 'go', 'come', 'look', 'listen', 'wait', 'help', 'start', 'finish'];
+      const isImperative = imperativeWords.some(word => 
+        cleanText.toLowerCase().startsWith(word)
+      );
+      
+      // Add punctuation based on pause duration and content
+      if (pauseDuration > 2000) {
+        // Long pause (2+ seconds) = period, question mark, or exclamation
+        if (isQuestion) {
+          return cleanText + '? ';
+        } else if (isExclamation) {
+          return cleanText + '! ';
+        } else if (isImperative) {
+          return cleanText + '. ';
+        } else {
+          return cleanText + '. ';
+        }
+      } else if (pauseDuration > 800) {
+        // Medium pause (0.8-2 seconds) = comma or question mark
+        if (isQuestion && pauseDuration > 1500) {
+          return cleanText + '? ';
+        } else {
+          return cleanText + ', ';
+        }
+      } else if (pauseDuration > 400) {
+        // Short pause (0.4-0.8 seconds) = comma
         return cleanText + ', ';
       }
-    } else if (pauseDuration > 400) {
-      // Short pause (0.4-0.8 seconds) = comma
-      return cleanText + ', ';
+      
+      return cleanText + ' ';
+    } catch (error) {
+      console.warn('Error processing text with compromise:', error);
+      
+      // Fallback to simple punctuation
+      const questionWords = ['what', 'when', 'where', 'why', 'how', 'who', 'which', 'whose', 'whom'];
+      const isQuestion = questionWords.some(word => 
+        cleanText.toLowerCase().startsWith(word) || 
+        cleanText.toLowerCase().includes(` ${word} `)
+      );
+      
+      const exclamationWords = ['wow', 'amazing', 'incredible', 'fantastic', 'great', 'awesome', 'perfect'];
+      const isExclamation = exclamationWords.some(word => 
+        cleanText.toLowerCase().includes(word)
+      ) || cleanText.toLowerCase().includes('!');
+      
+      if (pauseDuration > 2000) {
+        if (isQuestion) {
+          return cleanText + '? ';
+        } else if (isExclamation) {
+          return cleanText + '! ';
+        } else {
+          return cleanText + '. ';
+        }
+      } else if (pauseDuration > 800) {
+        if (isQuestion && pauseDuration > 1500) {
+          return cleanText + '? ';
+        } else {
+          return cleanText + ', ';
+        }
+      } else if (pauseDuration > 400) {
+        return cleanText + ', ';
+      }
+      
+      return cleanText + ' ';
     }
-    
-    return cleanText + ' ';
   };
 
   const handleSpeechPause = () => {
@@ -553,7 +607,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       
       <div className={`text-center max-w-md ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
         <p className="text-xs">
-          💡 Tip: Pause briefly for commas, longer for periods
+          💡 Tip: Pause briefly for commas, longer for periods, use question words for "?"
         </p>
       </div>
     </div>
