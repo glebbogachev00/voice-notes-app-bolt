@@ -16,6 +16,12 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
   const [browserInfo, setBrowserInfo] = useState<string>('');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [currentTranscript, setCurrentTranscript] = useState('');
+  
+  // Punctuation timing variables
+  const lastSpeechTimeRef = useRef<number>(Date.now());
+  const pauseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const finalTranscriptRef = useRef<string>('');
+  const interimTranscriptRef = useRef<string>('');
 
   const detectBrowser = () => {
     const userAgent = navigator.userAgent.toLowerCase();
@@ -58,6 +64,73 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     return info;
   };
 
+  const addPunctuation = (text: string, pauseDuration: number): string => {
+    if (!text.trim()) return text;
+    
+    // Remove any existing punctuation at the end
+    const cleanText = text.trim().replace(/[.,!?;:]$/, '');
+    
+    // Check for question patterns
+    const questionWords = ['what', 'when', 'where', 'why', 'how', 'who', 'which', 'whose', 'whom'];
+    const isQuestion = questionWords.some(word => 
+      cleanText.toLowerCase().startsWith(word) || 
+      cleanText.toLowerCase().includes(` ${word} `)
+    );
+    
+    // Check for exclamation patterns
+    const exclamationWords = ['wow', 'amazing', 'incredible', 'fantastic', 'great', 'awesome', 'perfect'];
+    const isExclamation = exclamationWords.some(word => 
+      cleanText.toLowerCase().includes(word)
+    ) || cleanText.toLowerCase().includes('!');
+    
+    // Add punctuation based on pause duration and content
+    if (pauseDuration > 2000) {
+      // Long pause (2+ seconds) = period or question mark
+      if (isQuestion) {
+        return cleanText + '? ';
+      } else if (isExclamation) {
+        return cleanText + '! ';
+      } else {
+        return cleanText + '. ';
+      }
+    } else if (pauseDuration > 800) {
+      // Medium pause (0.8-2 seconds) = comma or question mark
+      if (isQuestion && pauseDuration > 1500) {
+        return cleanText + '? ';
+      } else {
+        return cleanText + ', ';
+      }
+    } else if (pauseDuration > 400) {
+      // Short pause (0.4-0.8 seconds) = comma
+      return cleanText + ', ';
+    }
+    
+    return cleanText + ' ';
+  };
+
+  const handleSpeechPause = () => {
+    const now = Date.now();
+    const pauseDuration = now - lastSpeechTimeRef.current;
+    
+    // Clear existing timer
+    if (pauseTimerRef.current) {
+      clearTimeout(pauseTimerRef.current);
+    }
+    
+    // Set timer for punctuation detection
+    pauseTimerRef.current = setTimeout(() => {
+      if (interimTranscriptRef.current.trim()) {
+        const punctuatedText = addPunctuation(interimTranscriptRef.current, pauseDuration);
+        finalTranscriptRef.current += punctuatedText;
+        interimTranscriptRef.current = '';
+        
+        // Update the display
+        const fullTranscript = finalTranscriptRef.current + interimTranscriptRef.current;
+        setCurrentTranscript(fullTranscript);
+      }
+    }, 100); // Small delay to ensure we don't add punctuation too quickly
+  };
+
   const initializeRecognition = () => {
     // Check if speech recognition is supported
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -93,22 +166,36 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       recognition.interimResults = true;
     }
 
-    let finalTranscript = '';
-
     recognition.onresult = (event) => {
       let interimTranscript = '';
+      let finalTranscript = '';
       
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          finalTranscript += transcript + ' ';
+          finalTranscript += transcript;
         } else {
           interimTranscript += transcript;
         }
       }
       
-      const fullTranscript = finalTranscript + interimTranscript;
+      // Update last speech time
+      lastSpeechTimeRef.current = Date.now();
+      
+      // Handle final results
+      if (finalTranscript) {
+        finalTranscriptRef.current += finalTranscript + ' ';
+      }
+      
+      // Handle interim results
+      interimTranscriptRef.current = interimTranscript;
+      
+      // Update display
+      const fullTranscript = finalTranscriptRef.current + interimTranscriptRef.current;
       setCurrentTranscript(fullTranscript);
+      
+      // Handle speech pause for punctuation
+      handleSpeechPause();
     };
 
     recognition.onerror = (event) => {
@@ -142,13 +229,28 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     };
 
     recognition.onend = () => {
-      if (finalTranscript.trim()) {
-        onTranscriptUpdate(finalTranscript.trim());
-        finalTranscript = '';
+      // Add final punctuation if there's interim text
+      if (interimTranscriptRef.current.trim()) {
+        const punctuatedText = addPunctuation(interimTranscriptRef.current, 1000);
+        finalTranscriptRef.current += punctuatedText;
+        interimTranscriptRef.current = '';
       }
+      
+      // Send the final transcript
+      if (finalTranscriptRef.current.trim()) {
+        onTranscriptUpdate(finalTranscriptRef.current.trim());
+        finalTranscriptRef.current = '';
+      }
+      
       setCurrentTranscript('');
       setIsRecording(false);
       setIsPaused(false);
+      
+      // Clear any pending pause timers
+      if (pauseTimerRef.current) {
+        clearTimeout(pauseTimerRef.current);
+        pauseTimerRef.current = null;
+      }
       
       // For Safari, restart recognition automatically if it was recording
       if (browser === 'Safari' && isRecording) {
@@ -177,6 +279,9 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
+      if (pauseTimerRef.current) {
+        clearTimeout(pauseTimerRef.current);
+      }
     };
   }, [onTranscriptUpdate]);
 
@@ -188,6 +293,15 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
+    
+    // Clear timers and reset state
+    if (pauseTimerRef.current) {
+      clearTimeout(pauseTimerRef.current);
+      pauseTimerRef.current = null;
+    }
+    finalTranscriptRef.current = '';
+    interimTranscriptRef.current = '';
+    lastSpeechTimeRef.current = Date.now();
     
     // Reinitialize recognition
     setTimeout(() => {
@@ -201,6 +315,11 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
     
     setRecognitionError(''); // Clear any previous errors
     console.log('Attempting to start speech recognition...');
+    
+    // Reset punctuation state
+    finalTranscriptRef.current = '';
+    interimTranscriptRef.current = '';
+    lastSpeechTimeRef.current = Date.now();
     
     try {
       recognitionRef.current.start();
@@ -431,6 +550,12 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscriptUpdate, theme
           </p>
         </div>
       )}
+      
+      <div className={`text-center max-w-md ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
+        <p className="text-xs">
+          💡 Tip: Pause briefly for commas, longer for periods
+        </p>
+      </div>
     </div>
   );
 };
