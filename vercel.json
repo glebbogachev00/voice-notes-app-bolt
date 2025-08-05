@@ -8,7 +8,7 @@
   "devCommand": "npm run dev",
   "functions": {
     "api/*.ts": {
-      "runtime": "@vercel/node"
+      "runtime": "@vercel/node@5.3.10"
     }
   },
   "routes": [
